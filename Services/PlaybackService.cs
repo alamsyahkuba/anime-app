@@ -311,7 +311,18 @@ public sealed class PlaybackService
 
     private static IReadOnlyList<string> SplitDefaultCommand(string command)
     {
-        return File.Exists(command) ? [command] : SplitCommand(command);
+        command = command.Trim();
+        if (TryResolveExecutable(command, out var executable))
+        {
+            return [executable];
+        }
+
+        if (TrySplitExistingExecutableCommand(command, out var parts))
+        {
+            return parts;
+        }
+
+        return SplitCommand(command);
     }
 
     private static IReadOnlyList<string> SplitCommand(string? command)
@@ -353,6 +364,57 @@ public sealed class PlaybackService
         }
 
         return parts;
+    }
+
+    private static bool TrySplitExistingExecutableCommand(string command, out IReadOnlyList<string> parts)
+    {
+        for (var index = command.Length - 1; index >= 0; index--)
+        {
+            if (!char.IsWhiteSpace(command[index]))
+            {
+                continue;
+            }
+
+            var executableCandidate = command[..index];
+            if (!TryResolveExecutable(executableCandidate, out var executable))
+            {
+                continue;
+            }
+
+            parts = [executable, .. SplitCommand(command[(index + 1)..])];
+            return true;
+        }
+
+        parts = [];
+        return false;
+    }
+
+    private static bool TryResolveExecutable(string command, out string executable)
+    {
+        command = TrimMatchingQuotes(command.Trim());
+        if (File.Exists(command))
+        {
+            executable = command;
+            return true;
+        }
+
+        if (OperatingSystem.IsWindows()
+            && !command.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+            && File.Exists($"{command}.exe"))
+        {
+            executable = $"{command}.exe";
+            return true;
+        }
+
+        executable = string.Empty;
+        return false;
+    }
+
+    private static string TrimMatchingQuotes(string value)
+    {
+        return value.Length >= 2 && value[0] == '"' && value[^1] == '"'
+            ? value[1..^1]
+            : value;
     }
 
     private static string MakeSafeFileName(string value)
