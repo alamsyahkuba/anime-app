@@ -10,9 +10,7 @@ public sealed class PlaybackService
 
     public Task PlayAsync(EpisodeStream stream, string title, string episode, string? playerCommand)
     {
-        var command = string.IsNullOrWhiteSpace(playerCommand)
-            ? SplitDefaultCommand(DefaultPlayer)
-            : SplitCommand(playerCommand);
+        var command = SplitDefaultCommand(string.IsNullOrWhiteSpace(playerCommand) ? DefaultPlayer : playerCommand);
         if (command.Count == 0)
         {
             throw new InvalidOperationException("Player command is empty.");

@@ -11,7 +11,7 @@
 #define PublishExe "..\..\publish\win-x64\AnimeApp.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.1"
+  #define MyAppVersion "1.0.2"
 #endif
 
 #if !FileExists(PublishExe)
