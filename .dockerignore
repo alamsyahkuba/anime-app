@@ -1,0 +1,11 @@
+bin/
+obj/
+publish/
+dist/
+tools-archives/
+.avalonia-build-tasks/
+.git/
+.vs/
+.vscode/
+downloads/
+state/

@@ -1,0 +1,192 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AnimeApp.MainWindow"
+        Title="Anime App"
+        Width="1180"
+        Height="760"
+        MinWidth="920"
+        MinHeight="620">
+  <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12" Margin="14">
+    <Grid ColumnDefinitions="*,96,Auto,Auto,Auto" ColumnSpacing="8">
+      <TextBox x:Name="QueryBox"
+               Watermark="Cari anime"
+               KeyDown="QueryBox_OnKeyDown" />
+      <ComboBox x:Name="ModeBox"
+                Grid.Column="1"
+                SelectedIndex="0">
+        <ComboBoxItem Content="sub" />
+        <ComboBoxItem Content="dub" />
+      </ComboBox>
+      <Button x:Name="SearchButton"
+              Grid.Column="2"
+              Content="Search"
+              Click="SearchButton_OnClick" />
+      <Button x:Name="HistoryButton"
+              Grid.Column="3"
+              Content="History"
+              Click="HistoryButton_OnClick" />
+      <Button x:Name="NextReleaseButton"
+              Grid.Column="4"
+              Content="Next Release"
+              Click="NextReleaseButton_OnClick" />
+    </Grid>
+
+    <Grid Grid.Row="1"
+          ColumnDefinitions="2*,126,2*,2.1*"
+          ColumnSpacing="12">
+      <Grid RowDefinitions="Auto,*" RowSpacing="6">
+        <TextBlock Text="Anime"
+                   FontSize="16"
+                   FontWeight="SemiBold" />
+        <Border Grid.Row="1"
+                BorderBrush="#CCD3DC"
+                BorderThickness="1"
+                CornerRadius="6">
+          <ListBox x:Name="SearchResultsList"
+                   SelectionChanged="SearchResultsList_OnSelectionChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="8,6">
+                  <TextBlock Text="{Binding Name}"
+                             FontWeight="SemiBold"
+                             TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Detail}"
+                             FontSize="12"
+                             Foreground="#667085" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </Grid>
+
+      <Grid Grid.Column="1"
+            RowDefinitions="Auto,*"
+            RowSpacing="6">
+        <TextBlock Text="Episode"
+                   FontSize="16"
+                   FontWeight="SemiBold" />
+        <Border Grid.Row="1"
+                BorderBrush="#CCD3DC"
+                BorderThickness="1"
+                CornerRadius="6">
+          <ListBox x:Name="EpisodesList"
+                   SelectionChanged="EpisodesList_OnSelectionChanged" />
+        </Border>
+      </Grid>
+
+      <Grid Grid.Column="2"
+            RowDefinitions="Auto,*"
+            RowSpacing="6">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBlock Text="Links"
+                     FontSize="16"
+                     FontWeight="SemiBold" />
+          <Button x:Name="LoadLinksButton"
+                  Grid.Column="1"
+                  Content="Load"
+                  Click="LoadLinksButton_OnClick" />
+        </Grid>
+        <Border Grid.Row="1"
+                BorderBrush="#CCD3DC"
+                BorderThickness="1"
+                CornerRadius="6">
+          <ListBox x:Name="StreamsList">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="8,6">
+                  <TextBlock Text="{Binding Display}"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Url}"
+                             FontSize="11"
+                             Foreground="#667085"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </Grid>
+
+      <Grid Grid.Column="3"
+            RowDefinitions="Auto,Auto,Auto,Auto,Auto,*"
+            RowSpacing="8">
+        <TextBlock Text="Playback"
+                   FontSize="16"
+                   FontWeight="SemiBold" />
+
+        <Grid Grid.Row="1"
+              ColumnDefinitions="Auto,*"
+              ColumnSpacing="8"
+              RowDefinitions="Auto,Auto,Auto"
+              RowSpacing="8">
+          <TextBlock Text="Quality"
+                     VerticalAlignment="Center" />
+          <TextBox x:Name="QualityBox"
+                   Grid.Column="1"
+                   Text="best"
+                   Watermark="best, worst, 720p" />
+
+          <TextBlock Grid.Row="1"
+                     Text="Player"
+                     VerticalAlignment="Center" />
+          <TextBox x:Name="PlayerBox"
+                   Grid.Row="1"
+                   Grid.Column="1"
+                   Watermark="mpv" />
+
+          <TextBlock Grid.Row="2"
+                     Text="Download"
+                     VerticalAlignment="Center" />
+          <TextBox x:Name="DownloadDirBox"
+                   Grid.Row="2"
+                   Grid.Column="1"
+                   Watermark="./downloads" />
+        </Grid>
+
+        <Grid Grid.Row="2"
+              ColumnDefinitions="*,*,*"
+              ColumnSpacing="8">
+          <Button x:Name="PreviousButton"
+                  Content="Previous"
+                  Click="PreviousButton_OnClick" />
+          <Button x:Name="PlayButton"
+                  Grid.Column="1"
+                  Content="Play"
+                  Click="PlayButton_OnClick" />
+          <Button x:Name="NextButton"
+                  Grid.Column="2"
+                  Content="Next"
+                  Click="NextButton_OnClick" />
+        </Grid>
+
+        <Grid Grid.Row="3"
+              ColumnDefinitions="*,*"
+              ColumnSpacing="8">
+          <Button x:Name="DownloadButton"
+                  Content="Download"
+                  Click="DownloadButton_OnClick" />
+          <Button x:Name="ClearHistoryButton"
+                  Grid.Column="1"
+                  Content="Clear History"
+                  Click="ClearHistoryButton_OnClick" />
+        </Grid>
+
+        <TextBlock Grid.Row="4"
+                   Text="Log"
+                   FontWeight="SemiBold" />
+        <TextBox x:Name="LogBox"
+                 Grid.Row="5"
+                 AcceptsReturn="True"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 VerticalContentAlignment="Top" />
+      </Grid>
+    </Grid>
+
+    <TextBlock x:Name="StatusText"
+               Grid.Row="2"
+               Text="Siap."
+               TextWrapping="Wrap" />
+  </Grid>
+</Window>

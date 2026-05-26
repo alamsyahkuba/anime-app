@@ -1,0 +1,17 @@
+services:
+  dotnet:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: anime-app-dotnet:latest
+    environment:
+      DISPLAY: ${DISPLAY}
+      XAUTHORITY: /tmp/.docker.xauth
+      ANI_CLI_DOWNLOAD_DIR: /downloads
+      ANI_CLI_HIST_DIR: /state
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XAUTHORITY:-/tmp/.docker.xauth}:/tmp/.docker.xauth:ro
+      - ./downloads:/downloads
+      - ./state:/state
+    network_mode: bridge

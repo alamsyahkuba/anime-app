@@ -1,0 +1,32 @@
+# Build outputs
+bin/
+obj/
+publish/
+dist/
+.avalonia-build-tasks/
+
+# Local runtime data
+downloads/
+state/
+
+# Downloaded tool archives and local bundled binaries
+tools-archives/
+tools/win-x64/
+
+# IDE/editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.rsuser
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
