@@ -3,7 +3,7 @@
 ; Then compile this script on Windows with Inno Setup Compiler.
 ; To change the version, edit MyAppVersion below or pass it with ISCC /D.
 
-#define MyAppName "AnimeApp"
+#define MyAppName "Anime App"
 #define MyAppExeName "AnimeApp.exe"
 #define MyAppPublisher "Anime App"
 #define MyAppId "{{8D2F2E5F-71C5-49D9-A23A-6F777A089E5B}"
