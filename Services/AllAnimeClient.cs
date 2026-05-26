@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AnimeApp.Models;
@@ -8,10 +10,12 @@ namespace AnimeApp.Services;
 
 public sealed class AllAnimeClient : IDisposable
 {
-    public const string AllAnimeReferrer = "https://allmanga.to";
+    public const string AllAnimeReferrer = "https://youtu-chan.com";
     private const string AllAnimeBase = "allanime.day";
     private const string AllAnimeApi = "https://api.allanime.day";
-    private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0";
+    private const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0";
+    private const string EpisodeEmbedPersistedHash = "d405d0edd690624b66baba3068e0edc3ac90f1597d898a1ec8db4e5c43c00fec";
+    private static readonly byte[] AllAnimeCipherKey = SHA256.HashData(Encoding.UTF8.GetBytes("Xot36i3lK3:v1"));
 
     private static readonly (string Source, string SourceName)[] ProviderOrder =
     [
@@ -109,7 +113,6 @@ public sealed class AllAnimeClient : IDisposable
         string episode,
         CancellationToken cancellationToken = default)
     {
-        const string episodeEmbedGraphQl = "query ($showId: String!, $translationType: VaildTranslationTypeEnumType!, $episodeString: String!) { episode( showId: $showId translationType: $translationType episodeString: $episodeString ) { episodeString sourceUrls }}";
         var variables = new
         {
             showId,
@@ -117,9 +120,8 @@ public sealed class AllAnimeClient : IDisposable
             episodeString = episode
         };
 
-        using var document = await GraphQlAsync(episodeEmbedGraphQl, variables, cancellationToken);
-        if (!TryGetElement(document.RootElement, "data", "episode", "sourceUrls", out var sourceUrls)
-            || sourceUrls.ValueKind != JsonValueKind.Array)
+        using var document = await GraphQlPersistedAsync(EpisodeEmbedPersistedHash, variables, cancellationToken);
+        if (!TryGetEpisodeSourceUrls(document.RootElement, out var sourceUrls))
         {
             return [];
         }
@@ -175,22 +177,77 @@ public sealed class AllAnimeClient : IDisposable
 
     private async Task<JsonDocument> GraphQlAsync<TVariables>(string query, TVariables variables, CancellationToken cancellationToken)
     {
-        var variablesJson = JsonSerializer.Serialize(variables);
-        var url = $"{AllAnimeApi}/api?variables={Uri.EscapeDataString(variablesJson)}&query={Uri.EscapeDataString(query)}";
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var payload = JsonSerializer.Serialize(new
+        {
+            variables,
+            query
+        });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{AllAnimeApi}/api")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+
         request.Headers.Referrer = new Uri(AllAnimeReferrer);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.EnsureSuccessStatusCode();
+        EnsureSuccess(response, content);
+
+        return ParseGraphQlContent(content);
+    }
+
+    private async Task<JsonDocument> GraphQlPersistedAsync<TVariables>(
+        string hash,
+        TVariables variables,
+        CancellationToken cancellationToken)
+    {
+        var variablesJson = JsonSerializer.Serialize(variables);
+        var extensionsJson = JsonSerializer.Serialize(new
+        {
+            persistedQuery = new
+            {
+                version = 1,
+                sha256Hash = hash
+            }
+        });
+
+        var url = $"{AllAnimeApi}/api?variables={Uri.EscapeDataString(variablesJson)}&extensions={Uri.EscapeDataString(extensionsJson)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Referrer = new Uri(AllAnimeReferrer);
+        request.Headers.TryAddWithoutValidation("Origin", AllAnimeReferrer);
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        EnsureSuccess(response, content);
+
+        return ParseGraphQlContent(content);
+    }
+
+    private static JsonDocument ParseGraphQlContent(string content)
+    {
+        var document = JsonDocument.Parse(content);
+        if (!TryGetElement(document.RootElement, "data", "tobeparsed", out var encryptedElement)
+            || encryptedElement.ValueKind != JsonValueKind.String)
+        {
+            return document;
+        }
+
+        var encrypted = encryptedElement.GetString();
+        document.Dispose();
+
+        if (string.IsNullOrWhiteSpace(encrypted))
+        {
+            throw new InvalidOperationException("AllAnime returned an empty encrypted payload.");
+        }
 
         try
         {
-            return JsonDocument.Parse(content);
+            return JsonDocument.Parse(DecryptAllAnimePayload(encrypted));
         }
-        catch (JsonException exception)
+        catch (Exception exception) when (exception is FormatException or CryptographicException or JsonException)
         {
-            throw new InvalidOperationException($"AllAnime returned invalid JSON: {Truncate(content, 300)}", exception);
+            throw new InvalidOperationException("AllAnime returned an encrypted payload that could not be decoded.", exception);
         }
     }
 
@@ -431,6 +488,19 @@ public sealed class AllAnimeClient : IDisposable
         return new Uri(new Uri(baseUrl), path).ToString();
     }
 
+    private static bool TryGetEpisodeSourceUrls(JsonElement root, out JsonElement value)
+    {
+        return TryGetElement(root, "data", "episode", "sourceUrls", out value)
+            || TryGetElement(root, "episode", "sourceUrls", out value);
+    }
+
+    private static bool TryGetElement(JsonElement root, string first, string second, out JsonElement value)
+    {
+        value = default;
+        return root.TryGetProperty(first, out var firstValue)
+            && firstValue.TryGetProperty(second, out value);
+    }
+
     private static bool TryGetElement(JsonElement root, string first, string second, string third, out JsonElement value)
     {
         value = default;
@@ -497,6 +567,82 @@ public sealed class AllAnimeClient : IDisposable
     {
         var match = Regex.Match(text, pattern, RegexOptions.Singleline | RegexOptions.IgnoreCase);
         return match.Success ? NormalizeEscapedJson(match.Groups["value"].Value) : null;
+    }
+
+    private static string DecryptAllAnimePayload(string encrypted)
+    {
+        var payload = Convert.FromBase64String(encrypted);
+        if (payload.Length <= 29)
+        {
+            throw new CryptographicException("Encrypted payload is too short.");
+        }
+
+        var counter = new byte[16];
+        Buffer.BlockCopy(payload, 1, counter, 0, 12);
+        counter[15] = 2;
+
+        var cipherLength = payload.Length - 13 - 16;
+        var cipherText = new byte[cipherLength];
+        Buffer.BlockCopy(payload, 13, cipherText, 0, cipherLength);
+
+        return Encoding.UTF8.GetString(AesCtrTransform(cipherText, AllAnimeCipherKey, counter));
+    }
+
+    private static byte[] AesCtrTransform(byte[] input, byte[] key, byte[] counter)
+    {
+        using var aes = Aes.Create();
+        aes.Mode = CipherMode.ECB;
+        aes.Padding = PaddingMode.None;
+        aes.Key = key;
+
+        using var encryptor = aes.CreateEncryptor();
+        var output = new byte[input.Length];
+        var keystream = new byte[16];
+
+        for (var offset = 0; offset < input.Length; offset += 16)
+        {
+            encryptor.TransformBlock(counter, 0, counter.Length, keystream, 0);
+
+            var blockLength = Math.Min(16, input.Length - offset);
+            for (var index = 0; index < blockLength; index++)
+            {
+                output[offset + index] = (byte)(input[offset + index] ^ keystream[index]);
+            }
+
+            IncrementCounter(counter);
+        }
+
+        return output;
+    }
+
+    private static void IncrementCounter(byte[] counter)
+    {
+        for (var index = counter.Length - 1; index >= 0; index--)
+        {
+            counter[index]++;
+            if (counter[index] != 0)
+            {
+                return;
+            }
+        }
+    }
+
+    private static void EnsureSuccess(HttpResponseMessage response, string content)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var detail = content.Contains("challenge-platform", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)
+            ? "AllAnime menolak request dengan Cloudflare challenge."
+            : Truncate(content, 300);
+
+        throw new HttpRequestException(
+            $"AllAnime request failed: {(int)response.StatusCode} {response.ReasonPhrase}. {detail}",
+            null,
+            response.StatusCode);
     }
 
     private static string Truncate(string text, int maxLength)
